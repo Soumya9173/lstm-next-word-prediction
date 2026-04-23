@@ -25,8 +25,7 @@ A full-stack web application that predicts the next word in real-time using an L
 
 ## 📸 UI Screenshot
 
-> **Note to developer:** *Drop a screenshot of your app here! If you are editing on GitHub, you can just drag and drop an image file right here.*
-![NextWord AI UI Placeholder](https://via.placeholder.com/800x450.png?text=NextWord+AI+Web+Interface)
+<img width="1919" height="946" alt="image" src="https://github.com/user-attachments/assets/107c6a27-524b-4b46-8b5e-77a1517c5657" />
 
 ---
 
