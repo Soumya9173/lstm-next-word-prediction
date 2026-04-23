@@ -14,6 +14,7 @@
     const $input       = document.getElementById("input-text");
     const $ghostText   = document.getElementById("ghost-text");
     const $genBtn      = document.getElementById("generate-btn");
+    const $copyBtn     = document.getElementById("copy-btn");
     const $clearBtn    = document.getElementById("clear-btn");
     const $wordCount   = document.getElementById("word-count");
     const $wordValue   = document.getElementById("word-count-value");
@@ -304,6 +305,19 @@
 
     // Buttons
     $genBtn.addEventListener("click", handleGenerate);
+
+    $copyBtn.addEventListener("click", () => {
+        const text = $input.value.trim();
+        if (!text) {
+            toast("Nothing to copy", "error");
+            return;
+        }
+        navigator.clipboard.writeText(text).then(() => {
+            toast("Copied to clipboard!", "success");
+        }).catch(() => {
+            toast("Failed to copy", "error");
+        });
+    });
 
     $clearBtn.addEventListener("click", () => {
         $input.value = "";
