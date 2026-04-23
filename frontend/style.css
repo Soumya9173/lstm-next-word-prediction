@@ -581,6 +581,21 @@ kbd {
     opacity: 0.8;
 }
 
+.prediction-chip--autocomplete {
+    background: rgba(6, 182, 212, 0.08);
+    border-color: rgba(6, 182, 212, 0.2);
+}
+
+.prediction-chip--autocomplete:hover {
+    background: rgba(6, 182, 212, 0.18);
+    border-color: rgba(6, 182, 212, 0.4);
+    box-shadow: 0 4px 16px rgba(6, 182, 212, 0.2);
+}
+
+.prediction-chip--autocomplete strong {
+    color: var(--accent-cyan);
+}
+
 /* Shimmer loading */
 .predictions__loading {
     display: flex;

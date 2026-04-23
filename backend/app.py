@@ -250,6 +250,21 @@ def generate(req: GenerateRequest):
     )
 
 
+@app.get("/api/autocomplete")
+def autocomplete(prefix: str = "", limit: int = 8):
+    """Return vocabulary words matching a prefix for mid-word completion."""
+    prefix = prefix.lower().strip()
+    if not prefix or len(prefix) < 1:
+        return {"suggestions": [], "prefix": prefix}
+    matches = []
+    for word in word_index:
+        if word.startswith(prefix) and word != prefix:
+            matches.append(word)
+            if len(matches) >= limit:
+                break
+    return {"suggestions": matches, "prefix": prefix}
+
+
 # ---------------------------------------------------------------------------
 # Serve frontend
 # ---------------------------------------------------------------------------

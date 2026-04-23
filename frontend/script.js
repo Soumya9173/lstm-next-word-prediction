@@ -102,6 +102,12 @@
         return res.json();
     }
 
+    async function apiAutocomplete(prefix) {
+        const res = await fetch(`${API_BASE}/api/autocomplete?prefix=${encodeURIComponent(prefix)}&limit=8`);
+        if (!res.ok) throw new Error("Autocomplete failed");
+        return res.json();
+    }
+
     // ── Health Check ─────────────────────────────────────────
 
     async function checkHealth() {
@@ -185,17 +191,42 @@
     }
 
     async function fetchPredictions() {
-        const text = $input.value.trim();
-        if (!text) {
+        const text = $input.value;
+        const trimmed = text.trim();
+        if (!trimmed) {
             showEmpty();
             return;
         }
 
-        showLoading();
+        // Check if user is mid-word (no trailing space)
+        const isTypingWord = text.length > 0 && !text.endsWith(" ") && trimmed.includes(" ");
+        const lastWord = trimmed.split(/\s+/).pop();
 
+        // Mid-word: show autocomplete suggestions
+        if (isTypingWord && lastWord.length >= 2) {
+            showLoading();
+            const start = performance.now();
+            try {
+                const data = await apiAutocomplete(lastWord);
+                const latency = Math.round(performance.now() - start);
+                $statLatency.textContent = latency + "ms";
+
+                if (data.suggestions.length > 0) {
+                    showAutocomplete(data.suggestions, lastWord);
+                    predictionCount++;
+                    $statPreds.textContent = predictionCount;
+                    return;
+                }
+            } catch (err) {
+                console.error("Autocomplete error:", err);
+            }
+        }
+
+        // Full word(s) typed: show LSTM next-word predictions
+        showLoading();
         const start = performance.now();
         try {
-            const data = await apiPredictTop(text, 5);
+            const data = await apiPredictTop(trimmed, 5);
             const latency = Math.round(performance.now() - start);
             $statLatency.textContent = latency + "ms";
 
@@ -209,12 +240,54 @@
         }
     }
 
+    function showAutocomplete(suggestions, partial) {
+        $predLoading.style.display = "none";
+        $predEmpty.style.display = "none";
+        $predList.style.display = "flex";
+        $predList.innerHTML = "";
+
+        suggestions.forEach((word) => {
+            const chip = document.createElement("button");
+            chip.className = "prediction-chip prediction-chip--autocomplete";
+            // Highlight the matching prefix
+            const rest = word.slice(partial.length);
+            chip.innerHTML = `
+                <span><strong>${escapeHtml(partial)}</strong>${escapeHtml(rest)}</span>
+            `;
+            chip.title = `Complete: "${word}"`;
+            chip.addEventListener("click", () => acceptAutocomplete(word, partial));
+            $predList.appendChild(chip);
+        });
+
+        currentSuggestion = suggestions[0] || "";
+        // Ghost shows the completion of the current word
+        if (currentSuggestion) {
+            const rest = currentSuggestion.slice(partial.length);
+            const typed = $input.value;
+            $ghostText.innerHTML =
+                `<span style="visibility:hidden">${escapeHtml(typed)}</span><span class="ghost-suggestion">${escapeHtml(rest)}</span>`;
+        }
+
+        $predSub.textContent = `${suggestions.length} completions · Tab to accept`;
+    }
+
     function debouncedPredict() {
         clearTimeout(debounceTimer);
         debounceTimer = setTimeout(fetchPredictions, DEBOUNCE_MS);
     }
 
     // ── Accept Word ──────────────────────────────────────────
+
+    function acceptAutocomplete(fullWord, partial) {
+        // Replace the partial word with the full word
+        const text = $input.value;
+        const beforePartial = text.slice(0, text.length - partial.length);
+        $input.value = beforePartial + fullWord + " ";
+        $input.focus();
+        currentSuggestion = "";
+        updateGhostText();
+        debouncedPredict();
+    }
 
     function acceptWord(word) {
         const currentText = $input.value;
@@ -305,7 +378,16 @@
     $input.addEventListener("keydown", (e) => {
         if (e.key === "Tab" && currentSuggestion) {
             e.preventDefault();
-            acceptWord(currentSuggestion);
+            const text = $input.value;
+            const isTypingWord = text.length > 0 && !text.endsWith(" ");
+            if (isTypingWord) {
+                // Autocomplete mode: complete the current word
+                const partial = text.trim().split(/\s+/).pop();
+                acceptAutocomplete(currentSuggestion, partial);
+            } else {
+                // Prediction mode: add the next word
+                acceptWord(currentSuggestion);
+            }
         }
         // Ctrl+Enter to generate
         if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
