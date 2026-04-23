@@ -12,12 +12,21 @@ A full-stack web application that predicts the next word in real-time using an L
 ## ✨ Features
 
 - **Real-time Prediction** — Predictions appear as you type with 350ms debounce
+- **Advanced Generative Sampling** — Control creativity using Temperature, Top-K, and Top-P (Nucleus) sampling
+- **Mid-Word Autocomplete** — Suggests vocabulary word completions while you are still typing a word
 - **Top-K Suggestions** — See the top 5 next-word candidates with confidence scores
 - **Ghost Text** — Subtle inline suggestion overlay (press Tab to accept)
-- **Multi-Word Generation** — Generate up to 20 words at once
+- **Multi-Word Generation** — Generate up to 50 words at once
 - **Generation History** — Track and reload previous generations
 - **Live Stats** — Vocabulary size, max sequence length, prediction count, latency
-- **Premium Dark UI** — Glassmorphism, micro-animations, responsive design
+- **Light & Dark Themes** — Custom glassmorphic UI with local storage persistence and a seamless toggle
+
+---
+
+## 📸 UI Screenshot
+
+> **Note to developer:** *Drop a screenshot of your app here! If you are editing on GitHub, you can just drag and drop an image file right here.*
+![NextWord AI UI Placeholder](https://via.placeholder.com/800x450.png?text=NextWord+AI+Web+Interface)
 
 ---
 
@@ -135,6 +144,19 @@ curl -X POST http://127.0.0.1:8000/api/predict/top \
 
 ---
 
+## 🎲 How Sampling Works
+
+The application implements industry-standard sampling techniques to make the AI's text generation feel more natural and creative. Without sampling, the model would always pick the exact same "most likely" word (Greedy Search), resulting in boring, repetitive loops.
+
+- **Temperature**: Controls the randomness of predictions. 
+  - `Low (e.g., 0.2)`: Very conservative, picks highly probable words. Good for factual or predictable text.
+  - `1.0 (Default)`: Uses the model's raw probabilities.
+  - `High (e.g., 1.5)`: Flattens the probabilities, giving rare words a higher chance. Good for creative/wild text.
+- **Top-K Filtering**: Limits the AI to only choose from the top *K* (e.g., 40) most likely next words, discarding the long tail of highly improbable words to prevent absolute gibberish.
+- **Top-P (Nucleus) Filtering**: A smarter alternative to Top-K. It dynamically shrinks or expands the pool of candidate words based on their cumulative probability. If the model is highly confident, it might only pick from 2 words. If uncertain, it might pick from 50. It caps the cumulative probability at *P* (e.g., 0.9 or 90%).
+
+---
+
 ## 🧬 Model Details
 
 | Property | Value |
@@ -164,7 +186,6 @@ curl -X POST http://127.0.0.1:8000/api/predict/top \
 - [ ] Retrain with Dropout regularization to reduce overfitting
 - [ ] Add Early Stopping and learning rate scheduling
 - [ ] Use pre-trained word embeddings (GloVe / Word2Vec)
-- [ ] Add temperature-based sampling for more creative outputs
 - [ ] Deploy to cloud (Render / Railway / AWS)
 - [ ] Add user authentication and saved sessions
 
