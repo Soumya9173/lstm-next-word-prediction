@@ -34,6 +34,7 @@
     const $temperature = document.getElementById("temperature");
     const $tempValue   = document.getElementById("temp-value");
     const $samplingMode = document.getElementById("sampling-mode");
+    const $themeToggle = document.getElementById("theme-toggle");
 
     // ── State ────────────────────────────────────────────────
     let predictionCount = 0;
@@ -438,6 +439,24 @@
         const mode = $samplingMode.value;
         const labels = { "greedy": "Greedy", "top-k": "Top-K", "top-p": "Top-P", "top-k-p": "Top-K + Top-P" };
         toast(`Sampling: ${labels[mode]}`, "info");
+    });
+
+    // ── Theme Toggle ─────────────────────────────────────────
+
+    function applyTheme(theme) {
+        document.documentElement.setAttribute("data-theme", theme);
+        localStorage.setItem("nextword-theme", theme);
+    }
+
+    // Load saved theme
+    const savedTheme = localStorage.getItem("nextword-theme") || "dark";
+    if (savedTheme === "light") applyTheme("light");
+
+    $themeToggle.addEventListener("click", () => {
+        const current = document.documentElement.getAttribute("data-theme");
+        const next = current === "light" ? "dark" : "light";
+        applyTheme(next);
+        toast(`Theme: ${next === "light" ? "Light" : "Dark"} mode`, "info");
     });
 
     // ── Init ─────────────────────────────────────────────────
