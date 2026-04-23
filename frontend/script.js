@@ -31,6 +31,9 @@
     const $histEmpty   = document.getElementById("history-empty");
     const $clearHist   = document.getElementById("clear-history-btn");
     const $toastWrap   = document.getElementById("toast-container");
+    const $temperature = document.getElementById("temperature");
+    const $tempValue   = document.getElementById("temp-value");
+    const $samplingMode = document.getElementById("sampling-mode");
 
     // ── State ────────────────────────────────────────────────
     let predictionCount = 0;
@@ -58,6 +61,18 @@
         return String(n);
     }
 
+    /** Get current sampling parameters from UI controls */
+    function getSamplingParams() {
+        const temperature = parseFloat($temperature.value);
+        const mode = $samplingMode.value;
+        let top_k = 0;
+        let top_p = 1.0;
+        if (mode === "top-k") top_k = 40;
+        if (mode === "top-p") top_p = 0.9;
+        if (mode === "top-k-p") { top_k = 40; top_p = 0.9; }
+        return { temperature, top_k, top_p };
+    }
+
     // ── API Calls ────────────────────────────────────────────
 
     async function apiHealth() {
@@ -77,10 +92,11 @@
     }
 
     async function apiGenerate(text, nWords) {
+        const sampling = getSamplingParams();
         const res = await fetch(`${API_BASE}/api/generate`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ text, n_words: nWords }),
+            body: JSON.stringify({ text, n_words: nWords, ...sampling }),
         });
         if (!res.ok) throw new Error("Generation failed");
         return res.json();
@@ -331,6 +347,16 @@
     });
 
     $clearHist.addEventListener("click", clearHistory);
+
+    $temperature.addEventListener("input", () => {
+        $tempValue.textContent = parseFloat($temperature.value).toFixed(1);
+    });
+
+    $samplingMode.addEventListener("change", () => {
+        const mode = $samplingMode.value;
+        const labels = { "greedy": "Greedy", "top-k": "Top-K", "top-p": "Top-P", "top-k-p": "Top-K + Top-P" };
+        toast(`Sampling: ${labels[mode]}`, "info");
+    });
 
     // ── Init ─────────────────────────────────────────────────
 

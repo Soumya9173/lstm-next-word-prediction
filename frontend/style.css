@@ -459,6 +459,54 @@ kbd {
     color: var(--text-secondary);
 }
 
+/* ---------- Sampling Controls ---------- */
+.sampling-controls {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xl);
+    margin-top: var(--space-md);
+    padding: var(--space-md) var(--space-lg);
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    flex-wrap: wrap;
+}
+
+.sampling-control {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+}
+
+.select-input {
+    padding: 6px 12px;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.8rem;
+    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    outline: none;
+    cursor: pointer;
+    transition: all var(--duration) var(--ease);
+    -webkit-appearance: none;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%238888a8' stroke-width='1.5' fill='none'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    padding-right: 28px;
+}
+
+.select-input option {
+    background: #1a1a2e;
+    color: var(--text-primary);
+}
+
+.select-input:focus {
+    border-color: var(--border-focus);
+    box-shadow: 0 0 0 2px rgba(129, 140, 248, 0.1);
+}
+
 /* ---------- Predictions ---------- */
 .predictions {
     min-height: 60px;

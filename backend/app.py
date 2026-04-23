@@ -62,19 +62,27 @@ app.add_middleware(
 
 class PredictRequest(BaseModel):
     text: str
+    temperature: float = 1.0  # 0.1 = conservative, 2.0 = creative
+    top_k: int = 0            # 0 = disabled, else keep top K words
+    top_p: float = 1.0        # 1.0 = disabled, 0.9 = nucleus sampling
 
 class PredictResponse(BaseModel):
     next_word: str
     input_text: str
+    sampling: str
 
 class GenerateRequest(BaseModel):
     text: str
     n_words: int = 5
+    temperature: float = 1.0
+    top_k: int = 0
+    top_p: float = 1.0
 
 class GenerateResponse(BaseModel):
     generated_text: str
     input_text: str
     words_added: int
+    sampling: str
 
 class TopPredictionsRequest(BaseModel):
     text: str
@@ -88,38 +96,100 @@ class TopPredictionsResponse(BaseModel):
 # Prediction helpers
 # ---------------------------------------------------------------------------
 
-def _predict_next_word(text: str) -> str:
-    """Predict the single most likely next word."""
+def _get_probs(text: str):
+    """Get raw probability distribution for next word."""
     text = text.lower().strip()
     if not text:
-        return ""
+        return None
     seq = tokenizer.texts_to_sequences([text])[0]
     if not seq:
-        return ""
+        return None
     seq = pad_sequences([seq], maxlen=max_len, padding="pre")
-    pred = model.predict(seq, verbose=0)
-    idx = int(np.argmax(pred))
+    return model.predict(seq, verbose=0)[0]
+
+
+def _sample_from_probs(probs, temperature=1.0, top_k=0, top_p=1.0):
+    """
+    Sample a word index from the probability distribution using
+    temperature scaling, top-k filtering, and top-p (nucleus) filtering.
+    """
+    logits = np.log(probs + 1e-10)  # convert to log-probs
+
+    # --- Temperature scaling ---
+    if temperature != 1.0:
+        logits = logits / max(temperature, 1e-8)
+
+    # Re-exponentiate to get scaled probabilities
+    exp_logits = np.exp(logits - np.max(logits))  # subtract max for stability
+    scaled_probs = exp_logits / exp_logits.sum()
+
+    # --- Top-K filtering ---
+    if top_k > 0:
+        top_k = min(top_k, len(scaled_probs))
+        top_k_indices = np.argsort(scaled_probs)[-top_k:]
+        mask = np.zeros_like(scaled_probs)
+        mask[top_k_indices] = 1
+        scaled_probs = scaled_probs * mask
+        scaled_probs = scaled_probs / scaled_probs.sum()
+
+    # --- Top-P (nucleus) filtering ---
+    if top_p < 1.0:
+        sorted_indices = np.argsort(scaled_probs)[::-1]
+        sorted_probs = scaled_probs[sorted_indices]
+        cumulative = np.cumsum(sorted_probs)
+        # Find cutoff index where cumulative probability exceeds top_p
+        cutoff = np.searchsorted(cumulative, top_p) + 1
+        allowed_indices = sorted_indices[:cutoff]
+        mask = np.zeros_like(scaled_probs)
+        mask[allowed_indices] = 1
+        scaled_probs = scaled_probs * mask
+        scaled_probs = scaled_probs / scaled_probs.sum()
+
+    # --- Sample ---
+    idx = np.random.choice(len(scaled_probs), p=scaled_probs)
+    return int(idx)
+
+
+def _predict_next_word(text: str, temperature=1.0, top_k=0, top_p=1.0) -> str:
+    """Predict next word using sampling strategy."""
+    probs = _get_probs(text)
+    if probs is None:
+        return ""
+    # Greedy mode: no sampling, just argmax
+    if temperature == 1.0 and top_k == 0 and top_p == 1.0:
+        idx = int(np.argmax(probs))
+    else:
+        idx = _sample_from_probs(probs, temperature, top_k, top_p)
     return index_to_word.get(idx, "")
 
 
-def _predict_top_k(text: str, k: int = 5) -> list:
+def _get_sampling_label(temperature, top_k, top_p) -> str:
+    """Return a human-readable label for the sampling strategy."""
+    if temperature == 1.0 and top_k == 0 and top_p == 1.0:
+        return "greedy"
+    parts = []
+    if temperature != 1.0:
+        parts.append(f"temp={temperature}")
+    if top_k > 0:
+        parts.append(f"top-k={top_k}")
+    if top_p < 1.0:
+        parts.append(f"top-p={top_p}")
+    return ", ".join(parts)
+
+
+def _predict_top_k_list(text: str, k: int = 5) -> list:
     """Return top-k predicted words with confidence scores."""
-    text = text.lower().strip()
-    if not text:
+    probs = _get_probs(text)
+    if probs is None:
         return []
-    seq = tokenizer.texts_to_sequences([text])[0]
-    if not seq:
-        return []
-    seq = pad_sequences([seq], maxlen=max_len, padding="pre")
-    pred = model.predict(seq, verbose=0)[0]
-    top_indices = pred.argsort()[-k:][::-1]
+    top_indices = probs.argsort()[-k:][::-1]
     results = []
     for idx in top_indices:
         word = index_to_word.get(int(idx), "")
         if word:
             results.append({
                 "word": word,
-                "confidence": round(float(pred[idx]) * 100, 2),
+                "confidence": round(float(probs[idx]) * 100, 2),
             })
     return results
 
@@ -140,11 +210,12 @@ def health():
 
 @app.post("/api/predict", response_model=PredictResponse)
 def predict(req: PredictRequest):
-    """Predict the single most likely next word."""
+    """Predict the single most likely next word with optional sampling."""
     if not req.text.strip():
         raise HTTPException(status_code=400, detail="Text cannot be empty")
-    word = _predict_next_word(req.text)
-    return PredictResponse(next_word=word, input_text=req.text)
+    word = _predict_next_word(req.text, req.temperature, req.top_k, req.top_p)
+    label = _get_sampling_label(req.temperature, req.top_k, req.top_p)
+    return PredictResponse(next_word=word, input_text=req.text, sampling=label)
 
 
 @app.post("/api/predict/top", response_model=TopPredictionsResponse)
@@ -152,28 +223,30 @@ def predict_top(req: TopPredictionsRequest):
     """Return top-k next word predictions with confidence."""
     if not req.text.strip():
         raise HTTPException(status_code=400, detail="Text cannot be empty")
-    preds = _predict_top_k(req.text, req.top_k)
+    preds = _predict_top_k_list(req.text, req.top_k)
     return TopPredictionsResponse(predictions=preds, input_text=req.text)
 
 
 @app.post("/api/generate", response_model=GenerateResponse)
 def generate(req: GenerateRequest):
-    """Generate multiple next words sequentially."""
+    """Generate multiple next words with optional sampling."""
     if not req.text.strip():
         raise HTTPException(status_code=400, detail="Text cannot be empty")
     n = min(req.n_words, 50)  # cap at 50 words
     current = req.text
     words_added = 0
     for _ in range(n):
-        word = _predict_next_word(current)
+        word = _predict_next_word(current, req.temperature, req.top_k, req.top_p)
         if not word:
             break
         current += " " + word
         words_added += 1
+    label = _get_sampling_label(req.temperature, req.top_k, req.top_p)
     return GenerateResponse(
         generated_text=current,
         input_text=req.text,
         words_added=words_added,
+        sampling=label,
     )
 
 
