@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>NextWord AI — LSTM Powered Word Prediction</title>
+    <meta name="description" content="Real-time next word prediction powered by an LSTM neural network. Type and watch AI suggest what comes next." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+    <!-- Animated background grid -->
+    <div class="bg-grid" aria-hidden="true"></div>
+    <div class="bg-glow bg-glow--1" aria-hidden="true"></div>
+    <div class="bg-glow bg-glow--2" aria-hidden="true"></div>
+
+    <div class="app-container">
+        <!-- Header -->
+        <header class="header" id="app-header">
+            <div class="header__brand">
+                <div class="header__icon">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="url(#icon-grad)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <defs><linearGradient id="icon-grad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#818cf8"/><stop offset="100%" stop-color="#06b6d4"/></linearGradient></defs>
+                        <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
+                    </svg>
+                </div>
+                <h1 class="header__title">Next<span class="header__title--accent">Word</span> AI</h1>
+            </div>
+            <div class="header__badge">
+                <span class="badge badge--live" id="status-badge">
+                    <span class="badge__dot"></span>
+                    Connecting…
+                </span>
+            </div>
+        </header>
+
+        <!-- Main content -->
+        <main class="main">
+            <!-- Input Card -->
+            <section class="card card--input" id="input-section">
+                <div class="card__header">
+                    <h2 class="card__title">Start Typing</h2>
+                    <p class="card__subtitle">The LSTM model predicts your next word in real-time</p>
+                </div>
+                <div class="textarea-wrapper" id="textarea-wrapper">
+                    <textarea
+                        id="input-text"
+                        class="textarea"
+                        placeholder="Type something here… e.g. &quot;the world is&quot;"
+                        rows="4"
+                        spellcheck="false"
+                        autofocus
+                    ></textarea>
+                    <div class="textarea-ghost" id="ghost-text" aria-hidden="true"></div>
+                </div>
+
+                <!-- Action buttons -->
+                <div class="actions">
+                    <button class="btn btn--primary" id="generate-btn" disabled>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18m0-18l-4 4m4-4l4 4"/></svg>
+                        Generate
+                    </button>
+                    <div class="actions__slider">
+                        <label for="word-count" class="slider__label">Words: <span id="word-count-value">5</span></label>
+                        <input type="range" id="word-count" class="slider" min="1" max="20" value="5" />
+                    </div>
+                    <button class="btn btn--ghost" id="clear-btn">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                        Clear
+                    </button>
+                </div>
+
+                <!-- Keyboard hint -->
+                <p class="hint">Press <kbd>Tab</kbd> to accept suggestion · <kbd>Enter</kbd> to generate</p>
+            </section>
+
+            <!-- Predictions Card -->
+            <section class="card card--predictions" id="predictions-section">
+                <div class="card__header">
+                    <h2 class="card__title">Predictions</h2>
+                    <p class="card__subtitle" id="predictions-subtitle">Top suggestions will appear here</p>
+                </div>
+                <div class="predictions" id="predictions-container">
+                    <div class="predictions__empty" id="predictions-empty">
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" opacity="0.3">
+                            <circle cx="12" cy="12" r="10"/><path d="M8 12h8"/><path d="M12 8v8"/>
+                        </svg>
+                        <p>Type something to see predictions</p>
+                    </div>
+                    <div class="predictions__list" id="predictions-list"></div>
+                    <div class="predictions__loading" id="predictions-loading" style="display:none;">
+                        <div class="shimmer-chip"></div>
+                        <div class="shimmer-chip"></div>
+                        <div class="shimmer-chip"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Stats Bar -->
+            <section class="stats-bar" id="stats-bar">
+                <div class="stat">
+                    <span class="stat__value" id="stat-vocab">—</span>
+                    <span class="stat__label">Vocabulary</span>
+                </div>
+                <div class="stat">
+                    <span class="stat__value" id="stat-maxlen">—</span>
+                    <span class="stat__label">Max Sequence</span>
+                </div>
+                <div class="stat">
+                    <span class="stat__value" id="stat-predictions">0</span>
+                    <span class="stat__label">Predictions Made</span>
+                </div>
+                <div class="stat">
+                    <span class="stat__value" id="stat-latency">—</span>
+                    <span class="stat__label">Latency</span>
+                </div>
+            </section>
+
+            <!-- History -->
+            <section class="card card--history" id="history-section">
+                <div class="card__header">
+                    <h2 class="card__title">Generation History</h2>
+                    <button class="btn btn--ghost btn--sm" id="clear-history-btn">Clear</button>
+                </div>
+                <div class="history" id="history-container">
+                    <p class="history__empty" id="history-empty">Generated texts will appear here</p>
+                    <div class="history__list" id="history-list"></div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p>Built with <span class="footer__heart">♥</span> using LSTM · TensorFlow · FastAPI</p>
+        </footer>
+    </div>
+
+    <!-- Toast container -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <script src="/static/script.js"></script>
+</body>
+</html>
